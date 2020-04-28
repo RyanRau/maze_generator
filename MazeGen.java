@@ -1,22 +1,25 @@
 import java.awt.Graphics;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.Random;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 
 class cell{
+    public int size = 5;
     public int x, y;
-    public int xGrid, yGrid;
+
+    // N, E, S, W
     public boolean[] walls = {true, true, true, true};
     public boolean visited = false;
 
     public cell[] adj = {null, null, null, null};
+    public cell last = null;
 
-    cell(int x, int y){
+    cell(int x, int y, int size){
         this.x = x;
         this.y = y;
+        this.size = size;
     }
 
     public int[] getValidAdj(){
@@ -39,31 +42,29 @@ class cell{
     public void draw(Graphics g){
         // North
         if (walls[0]){
-            g.drawLine(this.x, this.y, this.x + 50, this.y);
+            g.drawLine(this.x, this.y, this.x + size, this.y);
         }
         // East
         if (walls[1]){
-            g.drawLine(this.x + 50, this.y, this.x + 50, this.y + 50);
+            g.drawLine(this.x + size, this.y, this.x + size, this.y + size);
         }
         // South
         if (walls[2]){
-            g.drawLine(this.x, this.y + 50, this.x + 50, this.y + 50);
+            g.drawLine(this.x, this.y + size, this.x + size, this.y + size);
         }
         // West
         if (walls[3]){
-            g.drawLine(this.x, this.y, this.x, this.y + 50);
+            g.drawLine(this.x, this.y, this.x, this.y + size);
         }
-        g.drawString(xGrid + ", " + yGrid, x + 10, y + 10);
     }
 }
 
 
 public class MazeGen extends JPanel {
-    public static final int size = 50;
-    public static int d = 10;
+    public static int size = 5;
+    public static int d = 5;
     public cell[][] cells = new cell[d][d];
-    public LinkedList<cell> stack = new LinkedList<cell>();
-    public int globalCount = 0;
+
 
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -76,36 +77,65 @@ public class MazeGen extends JPanel {
     }
 
 
-    public void createMaze(int x, int y){
-        cells[x][y].visited = true;
-        
-        int[] adj = cells[x][y].getValidAdj();
+    public void createMazeRecursive(cell c){
+        c.visited = true;
+
+        int [] adj = c.getValidAdj();
 
         if (adj.length == 0){
-            if (stack.size() <= 0){
+            if (c.last == null){
                 return;
             }else{
-                cell last = stack.removeLast();
-                createMaze(last.xGrid, last.yGrid);
+                cell last = c.last;
+                c.last = null;
+                createMazeRecursive(last);
             }
         }else{
-            stack.add(cells[x][y]);
             int next = new Random().nextInt(adj.length);
-            cells[x][y].walls[adj[next]] = false;
-            cells[x][y].adj[adj[next]].walls[(adj[next] + 2) % 4] = false;
-            createMaze(cells[x][y].adj[adj[next]].xGrid, cells[x][y].adj[adj[next]].yGrid);
+            c.walls[adj[next]] = false;
+            c.adj[adj[next]].walls[(adj[next] + 2) % 4] = false;
+            c.adj[adj[next]].last = c;
+            createMazeRecursive(c.adj[adj[next]]);
         }
     }
 
+
+    public void createMazeIterative(cell c){    
+        do{
+            c.visited = true;
+
+            int [] adj = c.getValidAdj();
+
+            if (adj.length == 0){
+                cell temp = c;
+                c = c.last;
+                temp.last = null;
+            }else{
+                int next = new Random().nextInt(adj.length);
+                c.walls[adj[next]] = false;
+                c.adj[adj[next]].walls[(adj[next] + 2) % 4] = false;
+                c.adj[adj[next]].last = c;
+
+                c = c.adj[adj[next]];
+            }
+        }while (c.last != null);
+    }
+
+
     public static void main(String[] args) {
-        d = Integer.parseInt(args[0]);
+        int method = 0;
+        if (args.length == 0){
+            d = 2;
+        }else{
+            d = Integer.parseInt(args[0]);
+            method = Integer.parseInt(args[1]);
+        }
+        
         MazeGen mazeGen = new MazeGen();
 
         for (int x = 0; x < d; x++){
             for (int y = 0; y < d; y++){
-                mazeGen.cells[x][y] = new cell((x * size) + 10, (y * size) + 10);  
-                mazeGen.cells[x][y].xGrid = x;
-                mazeGen.cells[x][y].yGrid = y;
+                mazeGen.cells[x][y] = new cell((x * size) + 10, (y * size) + 10, size);
             }
         }
 
@@ -135,12 +165,16 @@ public class MazeGen extends JPanel {
             }
         }
 
-        mazeGen.createMaze(0, 0);
+        if (method == 0){
+            mazeGen.createMazeRecursive(mazeGen.cells[0][0]);
+        }else{
+            mazeGen.createMazeIterative(mazeGen.cells[0][0]);
+        }
 
         JFrame frame = new JFrame("Maze");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.add(mazeGen);
-        frame.setSize(d * 50 + 20, d * 50 + 40);
+        frame.setSize(d * size + 20, d * size + 40);
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
     }
